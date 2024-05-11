@@ -10,5 +10,5 @@ This Flutter project demonstrates a simple implementation of a Reels-like featur
 - **Customizable**: Easily customize the appearance and behavior of the Reels component to fit your app's design.
 
 ## Videos
-![Demo Video](https://github.com/ProdevSoftware/reels_app/assets/97152083/bd6afa08-8b7a-48c3-9529-9ac80b3ba979)
+https://github.com/ProdevSoftware/reels_app/assets/97152083/bd6afa08-8b7a-48c3-9529-9ac80b3ba979
 
