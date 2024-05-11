@@ -1,16 +1,14 @@
-# untitled
+# Flutter Reels Demo
 
-A new Flutter project.
+This Flutter project demonstrates a simple implementation of a Reels-like feature, inspired by popular social media platforms. It includes basic functionality such as swiping between different videos, playing and pausing videos, and displaying likes and comments.
 
-## Getting Started
+## Features
 
-This project is a starting point for a Flutter application.
+- **Swiping Videos**: Users can swipe vertically to navigate between different videos.
+- **Video Playback**: Videos can be played, paused, and resumed.
+- **Likes and Comments**: Each video displays the number of likes and comments it has received.
+- **Customizable**: Easily customize the appearance and behavior of the Reels component to fit your app's design.
 
-A few resources to get you started if this is your first Flutter project:
+## Videos
+![Demo Video](https://github.com/ProdevSoftware/reels_app/assets/97152083/bd6afa08-8b7a-48c3-9529-9ac80b3ba979)
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
