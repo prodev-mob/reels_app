@@ -23,7 +23,24 @@ This Flutter project demonstrates a simple implementation of a Reels-like featur
   video_player: ^2.8.6
   animate_do: ^3.3.4
 ```
+## 2. Code SetUp
+- Intial Code SetUp
 
+  - Intialize 0 and play
+  - if(stories.length > 1) then intialize 1
+
+- Previous Stage
+  - Stop the [index] player
+  - Dispose [index + 1] player
+  - Initialize [index - 2] player
+  - play [index -1] player
+
+- Next Stage
+  - Stop the [index] player
+  - Dispose [index - 1] player
+  - Intialize [index + 2] player
+  - Play [index + 1] player
+  
 ## Videos
 
 https://github.com/prodev-mob/reels_app/assets/97152083/61b0a99d-b7b5-4657-b427-a66a9bb65cf6
