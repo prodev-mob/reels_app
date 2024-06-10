@@ -9,6 +9,22 @@ This Flutter project demonstrates a simple implementation of a Reels-like featur
 - **Likes and Comments**: Each video displays the number of likes and comments it has received.
 - **Customizable**: Easily customize the appearance and behavior of the Reels component to fit your app's design.
 
+## Getting Started
+
+## 1. Dependencies
+- Add below dependencies in pubspec.yaml
+```
+  cupertino_icons: ^1.0.6
+  better_player: ^0.0.83
+  cached_network_image: ^3.3.1
+  preload_page_view: ^0.2.0
+  card_swiper: ^3.0.1
+  intl: ^0.19.0
+  video_player: ^2.8.6
+  animate_do: ^3.3.4
+```
+
 ## Videos
-https://github.com/ProdevSoftware/reels_app/assets/97152083/bd6afa08-8b7a-48c3-9529-9ac80b3ba979
+
+https://github.com/prodev-mob/reels_app/assets/97152083/61b0a99d-b7b5-4657-b427-a66a9bb65cf6
 
