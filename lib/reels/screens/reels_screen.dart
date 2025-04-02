@@ -19,7 +19,7 @@ class _ReelsScreenState extends State<ReelsScreen> {
   List<ReelModel> reelsList = [
     ReelModel(
         isFollow: false,
-        'https://cloudflarestream.com/f8e3c0813ed1cb0e78dee3a611f10d82/manifest/video.m3u8',
+        'https://videos.pexels.com/video-files/4620563/4620563-hd_1080_2048_25fps.mp4',
         'Darshan Patil',
         likeCount: 2000,
         isLiked: true,
@@ -125,7 +125,7 @@ class _ReelsScreenState extends State<ReelsScreen> {
         commentList: []),
     ReelModel(
         isFollow: true,
-        'https://assets.mixkit.co/videos/preview/mixkit-father-and-his-little-daughter-eating-marshmallows-in-nature-39765-large.mp4',
+        'https://cloudflarestream.com/bf2559e4b3e67943cd423422a579b3eb/manifest/video.m3u8',
         'User 8',
         likeCount: 2600,
         isLiked: true,
@@ -136,7 +136,7 @@ class _ReelsScreenState extends State<ReelsScreen> {
         commentList: []),
     ReelModel(
         isFollow: false,
-        'https://videos.pexels.com/video-files/4620563/4620563-hd_1080_2048_25fps.mp4',
+        'https://cloudflarestream.com/3d721f2d5e5f5489e9001edd3dba0f82/manifest/video.m3u8',
         'User 9',
         likeCount: 1400,
         isLiked: false,
