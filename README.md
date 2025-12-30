@@ -15,11 +15,12 @@ This Flutter project demonstrates a simple implementation of a Reels-like featur
 - Add below dependencies in pubspec.yaml
 ```
   cupertino_icons: ^1.0.6
-  cached_network_image: ^3.3.1
+  cached_network_image: ^3.4.1
   card_swiper: ^3.0.1
-  intl: ^0.19.0
-  video_player: ^2.8.6
-  animate_do: ^3.3.4
+  intl: ^0.20.2
+  video_player: ^2.9.5
+  animate_do: ^4.2.0
+  sqflite_android: 2.4.1
 ```
 ## 2. Code SetUp
 - Intial Code SetUp
