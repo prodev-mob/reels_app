@@ -17,10 +17,7 @@ class UserProfileImage extends StatelessWidget {
         padding: EdgeInsets.zero,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          image: DecorationImage(
-            image: imageProvider,
-            fit: BoxFit.cover,
-          ),
+          image: DecorationImage(image: imageProvider, fit: BoxFit.cover),
         ),
       ),
       placeholder: (context, url) => const SizedBox(
@@ -28,11 +25,8 @@ class UserProfileImage extends StatelessWidget {
         width: 20,
         child: CircularProgressIndicator(),
       ),
-      errorWidget: (context, url, error) => const SizedBox(
-        height: 20,
-        width: 20,
-        child: Icon(Icons.error),
-      ),
+      errorWidget: (context, url, error) =>
+          const SizedBox(height: 20, width: 20, child: Icon(Icons.error)),
     );
   }
 }

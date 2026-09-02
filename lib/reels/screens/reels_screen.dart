@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:animate_do/animate_do.dart';
 import 'package:card_swiper/card_swiper.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:untitled/reels/components/screen_options.dart';
 import 'package:untitled/reels/models/reel_comment_model.dart';
 import 'package:untitled/reels/models/reel_model.dart';
@@ -16,7 +17,7 @@ class ReelsScreen extends StatefulWidget {
 }
 
 class _ReelsScreenState extends State<ReelsScreen> {
-  List<ReelModel> reelsList = [
+  final List<ReelModel> reelsList = [
     ReelModel(
         isFollow: false,
         'https://videos.pexels.com/video-files/4620563/4620563-hd_1080_2048_25fps.mp4',
@@ -147,184 +148,288 @@ class _ReelsScreenState extends State<ReelsScreen> {
         commentList: []),
   ];
 
-  final videoPlayerController = <VideoPlayerController>[];
+  final Map<int, VideoPlayerController> _controllers = {};
+  final Set<int> _failedIndices = {};
+  final Debouncer _debouncer = Debouncer(milliseconds: 200);
+
   bool _isPlaying = true;
   int currentIndex = 0;
-  int focusedIndex = 0;
 
   @override
   void initState() {
     super.initState();
+    _handleIndexChange(0);
+  }
 
-    for (var i = 0; i < reelsList.length; i++) {
-      videoPlayerController.add(VideoPlayerController.networkUrl(
-        Uri.parse(reelsList[i].url),
-      ));
+  @override
+  void dispose() {
+    _debouncer.cancel();
+    for (final controller in _controllers.values) {
+      controller.dispose();
     }
-    Future.delayed(const Duration(seconds: 1)).then((value) {
-      _playNextReel(0);
+    _controllers.clear();
+    super.dispose();
+  }
+
+  Future<void> _handleIndexChange(int index) async {
+    currentIndex = index;
+    _isPlaying = true;
+
+    // Pause all other controllers immediately
+    _controllers.forEach((idx, controller) {
+      if (idx != index) {
+        try {
+          if (controller.value.isInitialized) {
+            controller.pause();
+            controller.seekTo(Duration.zero);
+          }
+        } catch (_) {}
+      }
     });
+
+    // Dispose controllers that are far away (> 2 steps) to save memory
+    final keysToRemove = <int>[];
+    _controllers.forEach((idx, controller) {
+      if ((idx - index).abs() > 2) {
+        keysToRemove.add(idx);
+        try {
+          controller.dispose();
+        } catch (_) {}
+      }
+    });
+    for (final key in keysToRemove) {
+      _controllers.remove(key);
+    }
+
+    // Play target index
+    await _initAndPlay(index);
+
+    // Preload next and previous adjacent videos
+    if (index + 1 < reelsList.length) {
+      _preload(index + 1);
+    }
+    if (index - 1 >= 0) {
+      _preload(index - 1);
+    }
+  }
+
+  Future<void> _initAndPlay(int index) async {
+    if (index < 0 || index >= reelsList.length) return;
+
+    VideoPlayerController? controller = _controllers[index];
+
+    if (controller == null) {
+      controller = VideoPlayerController.networkUrl(Uri.parse(reelsList[index].url));
+      _controllers[index] = controller;
+      try {
+        await controller.initialize();
+        _failedIndices.remove(index);
+      } catch (e) {
+        debugPrint('Error initializing video at index $index: $e');
+        _failedIndices.add(index);
+        if (mounted) setState(() {});
+        return;
+      }
+    }
+
+    if (controller.value.isInitialized) {
+      if (currentIndex == index) {
+        await controller.setLooping(true);
+        await controller.play();
+        _isPlaying = true;
+      }
+    }
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _preload(int index) async {
+    if (index < 0 || index >= reelsList.length) return;
+    if (_controllers.containsKey(index)) return;
+
+    try {
+      final controller = VideoPlayerController.networkUrl(Uri.parse(reelsList[index].url));
+      _controllers[index] = controller;
+      await controller.initialize();
+      _failedIndices.remove(index);
+      if (mounted) setState(() {});
+    } catch (e) {
+      debugPrint('Error preloading video at index $index: $e');
+      _failedIndices.add(index);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black26,
-      body: SafeArea(
-        child: Swiper(
-          physics: videoPlayerController[currentIndex].value.isInitialized
-              ? const AlwaysScrollableScrollPhysics()
-              : const NeverScrollableScrollPhysics(),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+        systemNavigationBarColor: Colors.black,
+        systemNavigationBarIconBrightness: Brightness.light,
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: Swiper(
+          physics: const AlwaysScrollableScrollPhysics(),
           loop: false,
           scrollDirection: Axis.vertical,
-          itemCount: videoPlayerController.length,
+          itemCount: reelsList.length,
           onIndexChanged: (index) {
-            _isPlaying = true;
-            currentIndex = index;
-            final debouncer = Debouncer(milliseconds: 200);
-            if (index > focusedIndex) {
-              debouncer.run(() {
-                _playNextReel(index);
-              });
-            } else {
-              debouncer.run(() {
-                _playPreviousReel(index);
-              });
-            }
-            focusedIndex = index;
+            _debouncer.run(() {
+              _handleIndexChange(index);
+            });
           },
           itemBuilder: (context, index) {
-            return focusedIndex == index
-                ? videoPlayerController[index].value.isInitialized
-                    ? FadeIn(
-                        duration: const Duration(milliseconds: 900),
-                        child: GestureDetector(
-                          onTap: () {
-                            if (_isPlaying) {
-                              _isPlaying = !_isPlaying;
-                              videoPlayerController[index].pause();
+            final controller = _controllers[index];
+            final hasError = _failedIndices.contains(index) || (controller?.value.hasError ?? false);
+            final isInitialized = controller != null && controller.value.isInitialized && !hasError;
+
+            if (hasError) {
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  Container(
+                    color: Colors.black,
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.error_outline_rounded, color: Colors.white70, size: 50),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'Video playback failed',
+                            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Swipe up or down to continue',
+                            style: TextStyle(color: Colors.white54, fontSize: 13),
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white24,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            ),
+                            onPressed: () {
+                              _failedIndices.remove(index);
+                              _controllers.remove(index)?.dispose();
                               setState(() {});
-                            } else {
-                              _isPlaying = !_isPlaying;
-                              videoPlayerController[index].play();
-                              videoPlayerController[index].setLooping(true);
-                              setState(() {});
-                            }
-                          },
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(6),
-                                child: Container(
-                                  child: videoPlayerController[index].value.isInitialized
-                                      ? AspectRatio(
-                                          aspectRatio:
-                                              videoPlayerController[index].value.aspectRatio,
-                                          child: VideoPlayer(videoPlayerController[index]),
-                                        )
-                                      : Container(),
-                                ),
-                              ),
-                              ScreenOptions(
-                                // isLike: _liked,
-                                // onClickMoreBtn: widget.onClickMoreBtn,
-                                // onComment: widget.onComment,
-                                // onFollow: widget.onFollow,
-                                // onLike: (url){
-                                //   setState(() {
-                                //     _liked = ! _liked;
-                                //   });
-                                //   if(widget.onLike != null){
-                                //     widget.onLike!(url);
-                                //   }
-                                // },
-                                // onShare: widget.onShare,
-                                // showVerifiedTick: widget.showVerifiedTick,
-                                item: reelsList[index],
-                                isLike: reelsList[index].isLiked,
-                                showVerifiedTick: true,
-                                onFollow: () {},
-                                onLike: (v) {},
-                                onComment: (v) {},
-                                onClickMoreBtn: () {},
-                                onShare: (v) {},
-                              ),
-                              Visibility(
-                                visible: !_isPlaying,
-                                child: const Icon(
-                                  Icons.play_arrow_rounded,
-                                  size: 60,
-                                  color: Colors.white,
-                                ),
-                              )
-                            ],
+                              _initAndPlay(index);
+                            },
+                            icon: const Icon(Icons.refresh, size: 18),
+                            label: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  SafeArea(
+                    child: ScreenOptions(
+                      item: reelsList[index],
+                      isLike: reelsList[index].isLiked,
+                      showVerifiedTick: true,
+                      onFollow: () {},
+                      onLike: (v) {},
+                      onComment: (v) {},
+                      onClickMoreBtn: () {},
+                      onShare: (v) {},
+                    ),
+                  ),
+                ],
+              );
+            }
+
+            if (!isInitialized) {
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  Container(
+                    color: Colors.black,
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.5,
+                      ),
+                    ),
+                  ),
+                  SafeArea(
+                    child: ScreenOptions(
+                      item: reelsList[index],
+                      isLike: reelsList[index].isLiked,
+                      showVerifiedTick: true,
+                      onFollow: () {},
+                      onLike: (v) {},
+                      onComment: (v) {},
+                      onClickMoreBtn: () {},
+                      onShare: (v) {},
+                    ),
+                  ),
+                ],
+              );
+            }
+
+            return FadeIn(
+              duration: const Duration(milliseconds: 300),
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  if (_isPlaying) {
+                    controller.pause();
+                    _isPlaying = false;
+                  } else {
+                    controller.play();
+                    controller.setLooping(true);
+                    _isPlaying = true;
+                  }
+                  setState(() {});
+                },
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Container(
+                      color: Colors.black,
+                      child: Center(
+                        child: AspectRatio(
+                          aspectRatio: controller.value.aspectRatio,
+                          child: VideoPlayer(controller),
+                        ),
+                      ),
+                    ),
+                    SafeArea(
+                      child: ScreenOptions(
+                        item: reelsList[index],
+                        isLike: reelsList[index].isLiked,
+                        showVerifiedTick: true,
+                        onFollow: () {},
+                        onLike: (v) {},
+                        onComment: (v) {},
+                        onClickMoreBtn: () {},
+                        onShare: (v) {},
+                      ),
+                    ),
+                    if (!_isPlaying)
+                      const Center(
+                        child: CircleAvatar(
+                          radius: 32,
+                          backgroundColor: Colors.black45,
+                          child: Icon(
+                            Icons.play_arrow_rounded,
+                            size: 48,
+                            color: Colors.white,
                           ),
                         ),
-                      )
-                    : const Center(child: CircularProgressIndicator())
-                : const Center(child: CircularProgressIndicator());
+                      ),
+                  ],
+                ),
+              ),
+            );
           },
         ),
       ),
     );
-  }
-
-  void _playNextReel(int index) {
-    _stopControllerAtIndex(index - 1);
-    _disposeControllerAtIndex(index - 2);
-    _playControllerAtIndex(index);
-
-    /// Initialize [index + 1] controller
-    _initializeControllerAtIndex(index + 1);
-  }
-
-  void _playPreviousReel(int index) {
-    _stopControllerAtIndex(index + 1);
-    _disposeControllerAtIndex(index + 2);
-    _playControllerAtIndex(index);
-    _initializeControllerAtIndex(index - 1);
-  }
-
-  void _stopControllerAtIndex(int index) {
-    if (reelsList.length > index && index >= 0) {
-      final _controller = videoPlayerController[index];
-      _controller.pause();
-      _controller.seekTo(const Duration());
-    }
-  }
-
-  void _disposeControllerAtIndex(int index) {
-    if (reelsList.length > index && index >= 0) {
-      final _controller = videoPlayerController[index];
-      _controller.dispose();
-    }
-  }
-
-  void _playControllerAtIndex(int index) {
-    if (reelsList.length > index && index >= 0) {
-      final _controller = videoPlayerController[index];
-      if (_controller.value.isInitialized) {
-        _controller.play();
-        _controller.setLooping(true);
-      } else {
-        _initializeControllerAtIndex(index).then((value) {
-          videoPlayerController[index].play();
-          videoPlayerController[index].setLooping(true);
-          setState(() {});
-        });
-      }
-    }
-  }
-
-  Future _initializeControllerAtIndex(int index) async {
-    if (reelsList.length > index && index >= 0) {
-      final _controller = VideoPlayerController.networkUrl(Uri.parse(reelsList[index].url));
-      videoPlayerController[index] = _controller;
-      await _controller.initialize().then((value) {
-        setState(() {});
-      });
-    }
   }
 }
 
@@ -335,10 +440,14 @@ class Debouncer {
   Timer? _timer;
 
   void run(VoidCallback action) {
+    cancel();
+    _timer = Timer(Duration(milliseconds: milliseconds), action);
+  }
+
+  void cancel() {
     if (_timer?.isActive ?? false) {
       _timer?.cancel();
     }
-    _timer = Timer(Duration(milliseconds: milliseconds), action);
   }
 }
 
